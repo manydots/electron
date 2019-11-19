@@ -1,0 +1,49 @@
+{
+  "name": "electron",
+  "version": "1.0.0",
+  "description": "Electron application demo",
+  "main": "main.js",
+  "build": {
+    "appId": "com.xxx.app",
+    "productName": "Qs",
+    "compression": "store",
+    "copyright": "Mo.chen",
+    "asar": false,
+    "win": {
+      "target": ["nsis"]
+    },
+    "directories": {
+      "output": "build"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "桌面图标名字"
+    }
+  },
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^7.1.1",
+    "electron-builder": "^22.1.0"
+  },
+  "keywords": [
+    "Electron",
+    "quick"
+  ],
+  "electronDownload": {
+    "mirror": "https://npm.taobao.org/mirrors/electron/"
+  },
+  "author": "Mo.chen",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:manydots/electron.git"
+  },
+  "license": "MIT"
+}
