@@ -1,17 +1,18 @@
-// Modules to control application life and create native browser window
 const {
   app,
   BrowserWindow,
   Menu,
-  MenuItem
+  MenuItem,
+  globalShortcut,
+  Notification,
+  shell,
+  autoUpdater
 } = require('electron');
 const path = require('path');
 
-
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
-
+//通知模块
+//console.log(Notification.isSupported())
 
 // 特点：
 // 1、electron-builder 可以打包成msi、exe、dmg文件，macOS系统，只能打包dmg文件，window系统才能打包exe，msi文件；
@@ -19,32 +20,162 @@ let mainWindow;
 // 3、支持Auto Update；
 // 4、支持CLI和JS API两种使用方式；
 
+/**
+ * 注册键盘快捷键
+ * 其中：label: '切换开发者工具',这个可以在发布时注释掉
+ */
 let template = [{
-  label: '菜单1'
-}, {
-  label: '菜单2',
+  label: 'Edit ( 操作 )',
   submenu: [{
-    label: '最小化',
-    accelerator: 'CmdOrCtrl+M',
-    role: 'minimize'
+    label: 'Copy ( 复制 )',
+    accelerator: 'CmdOrCtrl+C',
+    role: 'copy'
   }, {
-    label: '关闭',
-    accelerator: 'CmdOrCtrl+W',
-    role: 'close'
+    label: 'Paste ( 粘贴 )',
+    accelerator: 'CmdOrCtrl+V',
+    role: 'paste'
   }, {
-    type: 'separator'
-  }, {
-    label: '重新打开窗口',
-    accelerator: 'CmdOrCtrl+Shift+T',
-    enabled: false,
-    key: 'reopenMenuItem',
-    click: function() {
-      app.emit('activate')
+    label: 'Reload ( 重新加载 )',
+    accelerator: 'CmdOrCtrl+R',
+    click: function(item, focusedWindow) {
+      if (focusedWindow) {
+        // on reload, start fresh and close any old
+        // open secondary windows
+        if (focusedWindow.id === 1) {
+          BrowserWindow.getAllWindows().forEach(function(win) {
+            if (win.id > 1) {
+              win.close()
+            }
+          })
+        }
+        focusedWindow.reload()
+      }
     }
   }]
 }, {
-  label: '菜单3'
+  label: 'Window ( 窗口 )',
+  role: 'window',
+  submenu: [{
+    label: 'Minimize ( 最小化 )',
+    accelerator: 'CmdOrCtrl+M',
+    role: 'minimize'
+  }, {
+    label: 'Close ( 关闭 )',
+    accelerator: 'CmdOrCtrl+W',
+    role: 'close'
+  }, {
+    label: '切换开发者工具',
+    accelerator: (function() {
+      if (process.platform === 'darwin') {
+        return 'Alt+Command+I'
+      } else {
+        return 'Ctrl+Shift+I'
+      }
+    })(),
+    click: function(item, focusedWindow) {
+      if (focusedWindow) {
+        focusedWindow.toggleDevTools()
+      }
+    }
+  }, {
+    type: 'separator'
+  }]
+}, {
+  label: 'Help ( 帮助 ) ',
+  role: 'help',
+  submenu: [{
+    label: 'electronjs文档 ( 意见反馈 )',
+    click: function() {
+      shell.openExternal('https://electronjs.org/docs')
+    }
+  }]
 }];
+
+
+/**
+ * 增加更新相关的菜单选项
+ */
+function addUpdateMenuItems(items, position) {
+  if (process.mas) {
+    return
+  }
+
+  const version = app.getVersion();
+  let updateItems = [{
+    label: `版本:${version}`,
+    enabled: false
+  }, {
+    label: '检查更新',
+    enabled: false,
+    key: 'checkingForUpdate'
+  }, {
+    label: 'Check for Update',
+    visible: false,
+    key: 'checkForUpdate',
+    click: function() {
+      autoUpdater.checkForUpdates();
+    }
+  }, {
+    label: 'Restart and Install Update',
+    enabled: true,
+    visible: false,
+    key: 'restartToUpdate',
+    click: function() {
+      autoUpdater.quitAndInstall();
+    }
+  }]
+
+  items.splice.apply(items, [position, 0].concat(updateItems))
+}
+
+function findReopenMenuItem() {
+  const menu = Menu.getApplicationMenu()
+  if (!menu) return
+
+  let reopenMenuItem
+  menu.items.forEach(function(item) {
+    if (item.submenu) {
+      item.submenu.items.forEach(function(item) {
+        if (item.key === 'reopenMenuItem') {
+          reopenMenuItem = item
+        }
+      })
+    }
+  })
+  return reopenMenuItem
+}
+
+// 针对Mac端的一些配置
+if (process.platform === 'darwin') {
+  const name = electron.app.getName()
+  template.unshift({
+    label: name,
+    submenu: [{
+      label: 'Quit ( 退出 )',
+      accelerator: 'Command+Q',
+      click: function() {
+        app.quit()
+      }
+    }]
+  })
+
+  // Window menu.
+  template[3].submenu.push({
+    type: 'separator'
+  }, {
+    label: 'Bring All to Front',
+    role: 'front'
+  })
+
+  addUpdateMenuItems(template[0].submenu, 1)
+}
+
+// 针对Windows端的一些配置
+if (process.platform === 'win32') {
+  const helpMenu = template[template.length - 1].submenu
+  addUpdateMenuItems(helpMenu, 0);
+}
+
 
 
 function createWindow() {
@@ -54,48 +185,59 @@ function createWindow() {
     height: 600,
     //autoHideMenuBar:true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js')
+      javascript: true,
+      plugins: true,
+      nodeIntegration: true, // 是否集成 Nodejs
+      webSecurity: false,
+      preload: path.join(__dirname, 'preload.js'),
     }
   });
 
-  let menu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(menu)
-  // and load the index.html of the app.
+  let menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+
   mainWindow.loadFile('index.html');
-
-  // Open the DevTools.
-  // mainWindow.webContents.openDevTools()
-
-  // Emitted when the window is closed.
   mainWindow.on('closed', function() {
-    // Dereference the window object, usually you would store windows
-    // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
     mainWindow = null;
   });
+
+  if (mainWindow) {
+
+    let isOpen = false;
+    //Ctrl+Shift+I
+    const ret = globalShortcut.register('CmdOrCtrl+U', function() {
+      if (isOpen == false) {
+        mainWindow.webContents.openDevTools();
+        isOpen = true;
+      } else {
+        mainWindow.webContents.closeDevTools();
+        isOpen = false;
+      }
+      //console.log('CmdOrCtrl+U is pressed');
+    });
+
+    // const { WebAPI } = require('./src/http');
+    // console.log(new Date().getTime())
+    // WebAPI();
+
+    if (!ret) {
+      console.log('registration failed')
+    }
+    // 检查快捷键是否注册成功
+    //console.log(globalShortcut.isRegistered('CmdOrCtrl+R'))
+  }
 };
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.on('ready', createWindow);
 
-// Quit when all windows are closed.
 app.on('window-all-closed', function() {
-  // On macOS it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
   if (process.platform !== 'darwin') {
     app.quit();
   };
 });
 
 app.on('activate', function() {
-  // On macOS it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (mainWindow === null) {
     createWindow();
   };
 });
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

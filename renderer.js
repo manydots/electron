@@ -4,3 +4,17 @@
 // `nodeIntegration` is turned off. Use `preload.js` to
 // selectively enable features needed in the rendering
 // process.
+
+window.onload = function() {
+	ts();
+}
+
+function ts(){
+	console.log(new Date().getTime())
+	console.log($('body').length);
+	$('.button').on('click',function(){
+		alert('click button')
+	})
+}
+
+

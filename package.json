@@ -8,7 +8,7 @@
     "productName": "Qs",
     "compression": "store",
     "copyright": "Mo.chen",
-    "asar": false,
+    "asar": true,
     "win": {
       "target": ["nsis"]
     },
